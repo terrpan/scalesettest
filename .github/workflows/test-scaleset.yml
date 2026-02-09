@@ -1,91 +1,29 @@
-name: Test Scale Set
+name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
-  test-scaleset:
-    name: Test Scale Set Functionality
+  build:
+    name: Build and Test
     runs-on: my-scaleset
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: System Information
-        run: |
-          echo "=== System Information ==="
-          uname -a
-          echo ""
-          echo "=== CPU Information ==="
-          lscpu || sysctl -n hw.ncpu || nproc
-          echo ""
-          echo "=== Memory Information ==="
-          free -h || vm_stat
-          echo ""
-          echo "=== Disk Space ==="
-          df -h
-          echo ""
-          echo "=== Docker Information ==="
-          docker --version
-          docker info
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
-      - name: Test Docker Functionality
+      - name: Docker smoke test
         run: |
-          echo "=== Testing Docker ==="
+          docker info --format '{{.ServerVersion}}'
           docker run --rm hello-world
 
-      - name: Test Network Connectivity
-        run: |
-          echo "=== Testing Network Connectivity ==="
-          ping -c 4 google.com
-          curl -I https://github.com
-
-      - name: Test File System Operations
-        run: |
-          echo "=== Testing File System ==="
-          mkdir test-dir
-          echo "Hello from scale set!" > test-dir/test-file.txt
-          cat test-dir/test-file.txt
-          ls -la test-dir/
-          rm -rf test-dir
-
-      - name: Test Environment Variables
-        run: |
-          echo "=== Environment Variables ==="
-          echo "Runner: $RUNNER_NAME"
-          echo "OS: $RUNNER_OS"
-          echo "Architecture: $RUNNER_ARCH"
-          echo "Temp Directory: $RUNNER_TEMP"
-          echo "Workspace: $GITHUB_WORKSPACE"
-
-      - name: Performance Test
-        run: |
-          echo "=== Performance Test ==="
-          echo "Starting CPU intensive task..."
-          timeout 30s yes > /dev/null || true
-          echo "CPU test completed"
-
-          echo "Starting memory allocation test..."
-          python3 -c "
-          import time
-          # Allocate and deallocate memory
-          data = []
-          for i in range(100):
-              data.append('x' * 1000000)  # 1MB per iteration
-              if i % 10 == 0:
-                  print(f'Allocated {i+1}00MB')
-          print('Memory test completed')
-          " || echo "Python test failed, continuing..."
-
-      - name: Scale Set Validation
-        run: |
-          echo "=== Scale Set Validation ==="
-          echo "Job completed successfully on testscaleset runner"
-          echo "Timestamp: $(date)"
-          echo "Job ID: $GITHUB_RUN_ID"
-          echo "Workflow: $GITHUB_WORKFLOW"
+      - name: Build
+        run: go build ./cmd/scaleset

@@ -1,0 +1,65 @@
+# ------------------------------------------------------------------
+# scaleset -- configuration file
+# ------------------------------------------------------------------
+# Copy this file to config.yaml and fill in the values.
+# CLI flags override any value set here.
+# ------------------------------------------------------------------
+
+github:
+  # Full URL where the scale set is registered.
+  # Can be a repo, org, or enterprise URL.
+  url: "https://github.com/org/repo"
+
+  # --- Authentication (pick ONE) ---
+
+  # Option 1: GitHub App (recommended)
+  app:
+    client_id: ""
+    installation_id: 0
+    # Path to the PEM file containing the app's private key.
+    private_key_path: ""
+    # Or inline (not recommended for production):
+    # private_key: |
+    #   -----BEGIN RSA PRIVATE KEY-----
+    #   ...
+    #   -----END RSA PRIVATE KEY-----
+
+  # Option 2: Personal Access Token
+  # token: "ghp_..."
+
+scaleset:
+  # Name of the scale set. Workflows target it via runs-on: <name>.
+  name: "my-scaleset"
+
+  # Extra labels for workflow targeting. Defaults to [name] if empty.
+  labels: []
+
+  # Runner group to register in. "default" uses the built-in group.
+  runner_group: "default"
+
+  # Runner count bounds.
+  min_runners: 0
+  max_runners: 10
+
+engine:
+  # Compute backend: "docker" (future: "ec2", "azure", "gcp")
+  type: "docker"
+
+  docker:
+    # Container image for the runner.
+    image: "ghcr.io/actions/actions-runner:latest"
+
+    # Enable Docker-in-Docker by bind-mounting the host's Docker socket
+    # (/var/run/docker.sock) into each runner container.  This lets
+    # workflows run docker build, docker compose, container actions, etc.
+    #
+    # Security: the socket gives runners full access to the host Docker
+    # daemon.  Only enable if you trust the workflows running on these
+    # runners.
+    dind: false
+
+logging:
+  # debug | info | warn | error
+  level: "info"
+  # text | json
+  format: "text"
