@@ -1,6 +1,10 @@
 # scaleset
 
-
+> **⚠️  Proof of Concept**
+> 
+> This is a **POC** implementation, **not production-tested**.  
+> The underlying `github.com/actions/scaleset` SDK is currently in **beta** (v0.1.0).  
+> Do not use in production environments without thorough testing.
 
 A compute-engine-agnostic autoscaler for GitHub Actions Runner Scale Sets,
 built on the [`github.com/actions/scaleset`](https://github.com/actions/scaleset) SDK.
