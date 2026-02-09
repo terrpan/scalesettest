@@ -16,6 +16,7 @@ import (
 
 	"github.com/terrpan/scaleset/internal/engine"
 	"github.com/terrpan/scaleset/internal/engine/docker"
+	"github.com/terrpan/scaleset/internal/engine/gcp"
 )
 
 // ---------------------------------------------------------------------------
@@ -77,11 +78,14 @@ type ScaleSetConfig struct {
 
 // EngineConfig selects and configures the compute backend.
 type EngineConfig struct {
-	// Type selects the compute backend: "docker", (future: "ec2", "azure", "gcp").
+	// Type selects the compute backend: "docker", "gcp" (future: "ec2", "azure").
 	Type string `yaml:"type"`
 
 	// Docker holds Docker-specific settings.  Only read when Type == "docker".
 	Docker DockerEngineConfig `yaml:"docker"`
+
+	// GCP holds GCP Compute Engine settings.  Only read when Type == "gcp".
+	GCP GCPEngineConfig `yaml:"gcp"`
 }
 
 // DockerEngineConfig holds Docker-specific engine settings.
@@ -90,6 +94,46 @@ type DockerEngineConfig struct {
 	// Dind enables Docker-in-Docker by bind-mounting the host's
 	// Docker socket into each runner container.
 	Dind bool `yaml:"dind"`
+}
+
+// GCPEngineConfig holds GCP Compute Engine engine settings.
+//
+// Authentication uses Application Default Credentials (ADC) -- no
+// credential fields are needed.  See docs/gcp/README.md for details.
+type GCPEngineConfig struct {
+	// Project is the GCP project ID (required when engine.type == "gcp").
+	Project string `yaml:"project"`
+
+	// Zone is the GCP zone for runner VMs (required).
+	Zone string `yaml:"zone"`
+
+	// MachineType is the Compute Engine machine type.  Default: "e2-medium".
+	MachineType string `yaml:"machine_type"`
+
+	// Image is the full self-link or family URL of the runner image (required).
+	// Examples:
+	//   "projects/my-project/global/images/scaleset-runner-1234567890"
+	//   "projects/my-project/global/images/family/scaleset-runner"
+	Image string `yaml:"image"`
+
+	// DiskSizeGB is the boot disk size in GB.  Default: 50.
+	DiskSizeGB int64 `yaml:"disk_size_gb"`
+
+	// Network is the VPC network name.  Default: "default".
+	Network string `yaml:"network"`
+
+	// Subnet is the subnetwork (optional).  If empty, the default
+	// subnet for the zone is used.
+	Subnet string `yaml:"subnet"`
+
+	// PublicIP controls whether runner VMs get an external IP address.
+	// Default: true.  Use a *bool so we can distinguish "not set"
+	// (nil -> default true) from "explicitly set to false".
+	PublicIP *bool `yaml:"public_ip"`
+
+	// ServiceAccount is the GCP service account email to attach to
+	// runner VMs (optional).
+	ServiceAccount string `yaml:"service_account"`
 }
 
 // ---------------------------------------------------------------------------
@@ -148,6 +192,16 @@ func (c *Config) ApplyDefaults() {
 	if c.Engine.Docker.Image == "" {
 		c.Engine.Docker.Image = "ghcr.io/actions/actions-runner:latest"
 	}
+	if c.Engine.GCP.MachineType == "" {
+		c.Engine.GCP.MachineType = "e2-medium"
+	}
+	if c.Engine.GCP.DiskSizeGB == 0 {
+		c.Engine.GCP.DiskSizeGB = 50
+	}
+	if c.Engine.GCP.PublicIP == nil {
+		t := true
+		c.Engine.GCP.PublicIP = &t
+	}
 	if c.Logging.Level == "" {
 		c.Logging.Level = "info"
 	}
@@ -183,8 +237,18 @@ func (c *Config) Validate() error {
 	switch c.Engine.Type {
 	case "docker":
 		// OK
+	case "gcp":
+		if c.Engine.GCP.Project == "" {
+			return fmt.Errorf("engine.gcp.project is required when engine.type is \"gcp\"")
+		}
+		if c.Engine.GCP.Zone == "" {
+			return fmt.Errorf("engine.gcp.zone is required when engine.type is \"gcp\"")
+		}
+		if c.Engine.GCP.Image == "" {
+			return fmt.Errorf("engine.gcp.image is required when engine.type is \"gcp\"")
+		}
 	default:
-		return fmt.Errorf("engine.type %q is not supported (supported: docker)", c.Engine.Type)
+		return fmt.Errorf("engine.type %q is not supported (supported: docker, gcp)", c.Engine.Type)
 	}
 
 	return nil
@@ -305,6 +369,18 @@ func (c *Config) NewEngine(ctx context.Context, logger *slog.Logger) (engine.Eng
 			Image: c.Engine.Docker.Image,
 			Dind:  c.Engine.Docker.Dind,
 		}, logger.WithGroup("engine.docker"))
+	case "gcp":
+		return gcp.New(ctx, gcp.Config{
+			Project:        c.Engine.GCP.Project,
+			Zone:           c.Engine.GCP.Zone,
+			MachineType:    c.Engine.GCP.MachineType,
+			Image:          c.Engine.GCP.Image,
+			DiskSizeGB:     c.Engine.GCP.DiskSizeGB,
+			Network:        c.Engine.GCP.Network,
+			Subnet:         c.Engine.GCP.Subnet,
+			PublicIP:       *c.Engine.GCP.PublicIP,
+			ServiceAccount: c.Engine.GCP.ServiceAccount,
+		}, logger.WithGroup("engine.gcp"))
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", c.Engine.Type)
 	}

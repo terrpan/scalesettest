@@ -42,7 +42,7 @@ scaleset:
   max_runners: 10
 
 engine:
-  # Compute backend: "docker" (future: "ec2", "azure", "gcp")
+  # Compute backend: "docker", "gcp" (future: "ec2", "azure")
   type: "docker"
 
   docker:
@@ -57,6 +57,43 @@ engine:
     # daemon.  Only enable if you trust the workflows running on these
     # runners.
     dind: false
+
+  # gcp:
+  #   # GCP project ID (required).
+  #   project: "my-project"
+  #
+  #   # Zone for runner VMs (required).
+  #   zone: "us-central1-a"
+  #
+  #   # Machine type for runner VMs.  Default: "e2-medium".
+  #   machine_type: "e2-medium"
+  #
+  #   # Full image self-link or family URL (required).
+  #   # Use a family URL to always get the latest image:
+  #   #   "projects/my-project/global/images/family/scaleset-runner"
+  #   # Or pin to a specific image:
+  #   #   "projects/my-project/global/images/scaleset-runner-1234567890"
+  #   image: "projects/my-project/global/images/family/scaleset-runner"
+  #
+  #   # Boot disk size in GB.  Default: 50.
+  #   disk_size_gb: 50
+  #
+  #   # VPC network name.  Default: "default".
+  #   network: "default"
+  #
+  #   # Subnetwork (optional).  If empty, the default subnet for the
+  #   # zone is used.
+  #   # subnet: "projects/my-project/regions/us-central1/subnetworks/my-subnet"
+  #
+  #   # Whether runner VMs get an external IP.  Default: true.
+  #   public_ip: true
+  #
+  #   # Service account to attach to runner VMs (optional).
+  #   # If empty, the project's default compute service account is used.
+  #   # service_account: "runner@my-project.iam.gserviceaccount.com"
+  #
+  #   # Authentication: uses Application Default Credentials (ADC).
+  #   # No credential fields needed.  See docs/gcp/README.md for setup.
 
 logging:
   # debug | info | warn | error

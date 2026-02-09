@@ -1,5 +1,7 @@
 # scaleset
 
+
+
 A compute-engine-agnostic autoscaler for GitHub Actions Runner Scale Sets,
 built on the [`github.com/actions/scaleset`](https://github.com/actions/scaleset) SDK.
 
@@ -11,14 +13,15 @@ and is then permanently destroyed.
 | Engine | Status |
 |--------|--------|
 | Docker | Available |
+| GCP Compute Engine | Available |
 | EC2    | Planned |
 | Azure VMs | Planned |
-| GCP    | Planned |
 
 ## Prerequisites
 
 - Go 1.25+
 - Docker daemon (for the Docker engine)
+- GCP project with Compute Engine API enabled (for the GCP engine)
 - A GitHub App or Personal Access Token with runner registration permissions
 
 ## Build
@@ -108,7 +111,10 @@ internal/
   engine/
     engine.go                 Engine interface (compute abstraction)
     docker/docker.go          Docker engine implementation
+    gcp/gcp.go                GCP Compute Engine implementation
   scaler/scaler.go            Engine-agnostic listener.Scaler implementation
+docs/
+  gcp/                        GCP image build guide & Packer template
 ```
 
 ### Runner lifecycle
@@ -153,6 +159,45 @@ Containers created by workflows become siblings on the host daemon.
 **Security:** the Docker socket gives runner containers full access to the host
 Docker daemon. Only enable this if you trust the workflows running on your
 runners.
+
+### GCP Compute Engine
+
+The GCP engine creates a Compute Engine VM for every job and deletes it
+when the job completes. Runners are strictly ephemeral -- VMs are terminated,
+never stopped.
+
+**Prerequisites:**
+
+- A GCP project with the Compute Engine API enabled
+- A pre-built runner VM image (see [docs/gcp/README.md](docs/gcp/README.md))
+- Application Default Credentials with `roles/compute.instanceAdmin.v1`
+
+**Authentication** uses [ADC](https://cloud.google.com/docs/authentication/application-default-credentials)
+-- no credential fields in config. Works with:
+
+- Attached service accounts (GCE, GKE Workload Identity, Cloud Run)
+- Workload Identity Federation (for running outside GCP)
+- `gcloud auth application-default login` (local dev)
+
+See [docs/gcp/README.md](docs/gcp/README.md) for detailed auth setup
+including WIF step-by-step instructions.
+
+**Configuration:**
+
+```yaml
+engine:
+  type: "gcp"
+  gcp:
+    project: "my-project"
+    zone: "us-central1-a"
+    image: "projects/my-project/global/images/family/scaleset-runner"
+    machine_type: "e2-medium"     # optional, default: e2-medium
+    disk_size_gb: 50              # optional, default: 50
+    public_ip: true               # optional, default: true
+    # network: "my-vpc"           # optional, default: "default"
+    # subnet: "projects/.../subnetworks/my-subnet"  # optional
+    # service_account: "runner@my-project.iam.gserviceaccount.com"  # optional
+```
 
 ## Targeting the scale set in workflows
 
