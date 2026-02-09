@@ -10,7 +10,7 @@ on:
 jobs:
   test-scaleset:
     name: Test Scale Set Functionality
-    runs-on: testscaleset
+    runs-on: my-scaleset
 
     steps:
       - name: Checkout code
