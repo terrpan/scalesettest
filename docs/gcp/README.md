@@ -136,20 +136,22 @@ If using a custom service account on runner VMs, also grant
 
 ## Building the Runner Image
 
-### 1. Authenticate Packer
+### Linux (Ubuntu 24.04)
+
+#### 1. Authenticate Packer
 
 ```bash
 gcloud auth application-default login
 ```
 
-### 2. Initialize Packer plugins
+#### 2. Initialize Packer plugins
 
 ```bash
 cd docs/gcp
 packer init .
 ```
 
-### 3. Build the image
+#### 3. Build the image
 
 ```bash
 packer build -var project_id=my-project .
@@ -166,7 +168,7 @@ Optional variables:
 | `runner_version` | `2.321.0` | GitHub Actions runner version |
 | `machine_type` | `e2-medium` | Build VM machine type |
 
-### 4. Reference the image in config
+#### 4. Reference the image in config
 
 After building, use the image family in your scaleset config so new VMs
 always use the latest image:
@@ -189,7 +191,56 @@ engine:
     image: "projects/my-project/global/images/scaleset-runner-1234567890"
 ```
 
-## What the Image Contains
+### Windows (Windows Server 2022)
+
+#### 1. Authenticate Packer
+
+```bash
+gcloud auth application-default login
+```
+
+#### 2. Initialize Packer plugins
+
+```bash
+cd docs/gcp/windows
+packer init .
+```
+
+#### 3. Build the image
+
+```bash
+packer build -var project_id=my-project .
+```
+
+The Windows build takes longer than Linux (~15-20 minutes) due to Windows
+updates, Docker feature installation, and the required reboot.
+
+Optional variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `project_id` | (required) | GCP project ID |
+| `zone` | `us-central1-a` | Build VM zone |
+| `image_name` | `scaleset-runner-windows` | Image name prefix |
+| `image_family` | `scaleset-runner-windows` | Image family |
+| `runner_version` | `2.321.0` | GitHub Actions runner version |
+| `machine_type` | `e2-medium` | Build VM machine type |
+| `disk_size` | `50` | Boot disk size in GB |
+
+#### 4. Reference the image in config
+
+```yaml
+engine:
+  type: "gcp"
+  gcp:
+    project: "my-project"
+    zone: "us-central1-a"
+    image: "projects/my-project/global/images/family/scaleset-runner-windows"
+```
+
+## What the Images Contain
+
+### Linux
 
 - **Ubuntu 24.04 LTS** base
 - **Docker CE** from the official Docker APT repository
@@ -199,13 +250,33 @@ engine:
   1. Reads `ACTIONS_RUNNER_INPUT_JITCONFIG` from GCP instance metadata
   2. Launches the runner agent as the `runner` user
 
+### Windows
+
+- **Windows Server 2022** base
+- **Docker** (Windows containers via DockerMsftProvider) -- runs Windows
+  containers only, not Linux containers
+- **Git for Windows** (via Chocolatey)
+- **GitHub Actions runner agent** installed to `C:\actions-runner`
+- **`ScalesetRunner` Scheduled Task** that:
+  1. Reads `ACTIONS_RUNNER_INPUT_JITCONFIG` from GCP instance metadata
+     via `Invoke-RestMethod`
+  2. Launches the runner agent as `SYSTEM`
+
+> **Note:** Docker on Windows Server provides Windows containers only.
+> If your workflows need Linux containers, use the Linux image instead.
+
 ## Runner Lifecycle
+
+The lifecycle is identical for Linux and Windows -- only the boot
+mechanism differs (systemd vs Scheduled Task):
 
 ```
 scaleset creates VM with JIT config in metadata
-  -> VM boots, systemd starts scaleset-runner.service
-    -> startup.sh reads JIT config from metadata server
-      -> runner agent registers and picks up the job
-        -> job completes
-          -> scaleset calls DestroyRunner, VM is deleted
+  -> VM boots
+    -> Linux: systemd starts scaleset-runner.service
+       Windows: Scheduled Task runs startup.ps1
+      -> startup script reads JIT config from metadata server
+        -> runner agent registers and picks up the job
+          -> job completes
+            -> scaleset calls DestroyRunner, VM is deleted
 ```

@@ -70,7 +70,8 @@ engine:
   #
   #   # Full image self-link or family URL (required).
   #   # Use a family URL to always get the latest image:
-  #   #   "projects/my-project/global/images/family/scaleset-runner"
+  #   #   Linux:   "projects/my-project/global/images/family/scaleset-runner"
+  #   #   Windows: "projects/my-project/global/images/family/scaleset-runner-windows"
   #   # Or pin to a specific image:
   #   #   "projects/my-project/global/images/scaleset-runner-1234567890"
   #   image: "projects/my-project/global/images/family/scaleset-runner"
