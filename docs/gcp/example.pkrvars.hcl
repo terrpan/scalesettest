@@ -18,7 +18,8 @@ project_id = "my-project"
 # image_family = "scaleset-runner"
 
 # Runner agent version (https://github.com/actions/runner/releases)
-# runner_version = "2.321.0"
+# Pin to a specific version to avoid deprecation issues:
+# runner_version = "2.323.0"
 
 # Network / connectivity ---------------------------------------------------
 

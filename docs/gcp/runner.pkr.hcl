@@ -47,8 +47,8 @@ variable "image_family" {
 
 variable "runner_version" {
   type        = string
-  default     = "2.321.0"
-  description = "GitHub Actions runner agent version to install."
+  default     = "2.331.0"
+  description = "GitHub Actions runner agent version.
 }
 
 variable "machine_type" {
@@ -77,7 +77,7 @@ variable "source_image_family" {
 
 variable "source_image_project_id" {
   type        = string
-  default     = ""
+  default     = "ubuntu-os-cloud"
   description = "GCP project containing the source image. If empty, Packer searches well-known public projects."
 }
 

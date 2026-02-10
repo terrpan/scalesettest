@@ -90,6 +90,9 @@ type EngineConfig struct {
 
 // DockerEngineConfig holds Docker-specific engine settings.
 type DockerEngineConfig struct {
+	// Image is the container image for the runner.  Use ":latest" (default) for
+	// the newest release, or pin a specific version (e.g. "ghcr.io/actions/actions-runner:2.323.0").
+	// Default: "ghcr.io/actions/actions-runner:latest"
 	Image string `yaml:"image"`
 	// Dind enables Docker-in-Docker by bind-mounting the host's
 	// Docker socket into each runner container.

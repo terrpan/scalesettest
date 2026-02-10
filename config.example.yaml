@@ -47,6 +47,9 @@ engine:
 
   docker:
     # Container image for the runner.
+    # Use ":latest" (default) for the newest release, or pin a specific version:
+    #   "ghcr.io/actions/actions-runner:latest"     # Always latest
+    #   "ghcr.io/actions/actions-runner:2.323.0"    # Pin to v2.323.0
     image: "ghcr.io/actions/actions-runner:latest"
 
     # Enable Docker-in-Docker by bind-mounting the host's Docker socket

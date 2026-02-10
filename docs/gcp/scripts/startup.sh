@@ -14,7 +14,5 @@ if [ -z "$JITCONFIG" ]; then
   exit 1
 fi
 
-export ACTIONS_RUNNER_INPUT_JITCONFIG="$JITCONFIG"
-
 cd /home/runner
-exec su runner -c ./run.sh
+exec runuser -u runner -- env "ACTIONS_RUNNER_INPUT_JITCONFIG=$JITCONFIG" ./run.sh

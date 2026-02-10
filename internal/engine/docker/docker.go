@@ -19,7 +19,10 @@ import (
 // Config holds Docker-specific settings.
 type Config struct {
 	// Image is the container image to use for runners.
-	// Default: ghcr.io/actions/actions-runner:latest
+	// Use ":latest" (default) for the newest release, or pin a specific version:
+	//   "ghcr.io/actions/actions-runner:latest"    # Always latest
+	//   "ghcr.io/actions/actions-runner:2.323.0"   # Pin to v2.323.0
+	// Default: "ghcr.io/actions/actions-runner:latest"
 	Image string
 
 	// Dind enables Docker-in-Docker by bind-mounting the host's Docker
