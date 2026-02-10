@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Build and Test
-    runs-on: my-scaleset
+    runs-on: my-scaleset-gcp
 
     steps:
       - name: Checkout
