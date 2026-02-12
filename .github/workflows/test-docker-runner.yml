@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     name: Build and Test
-    runs-on: my-scaleset-gcp
+    runs-on: my-scaleset-docker
 
     steps:
       - name: Checkout

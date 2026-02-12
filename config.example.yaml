@@ -104,3 +104,21 @@ logging:
   level: "info"
   # text | json
   format: "text"
+
+# ------------------------------------------------------------------
+# OpenTelemetry (tracing and metrics)
+# ------------------------------------------------------------------
+# otel:
+#   # Enable OpenTelemetry tracing and metrics.  Default: false.
+#   enabled: false
+#
+#   # OTLP HTTP endpoint (e.g. Grafana Alloy, OTEL Collector).
+#   # If empty, uses OTEL_EXPORTER_OTLP_ENDPOINT env var.  Default: "".
+#   endpoint: "localhost:4318"
+#
+#   # Use plain HTTP (no TLS) for OTLP export.  Default: true.
+#   insecure: true
+#
+#   # Also print traces/metrics to stdout (debugging).  Default: false.
+#   # stdout: true
+

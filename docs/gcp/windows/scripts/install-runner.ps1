@@ -43,7 +43,12 @@ $GitUrl = "https://github.com/git-for-windows/git/releases/download/v$GitVersion
 $GitInstallerPath = "$env:TEMP\$GitInstaller"
 
 Write-Host "Downloading $GitUrl"
-Invoke-WebRequest -Uri $GitUrl -OutFile $GitInstallerPath -UseBasicParsing
+$webClient = New-Object System.Net.WebClient
+try {
+    $webClient.DownloadFile($GitUrl, $GitInstallerPath)
+} finally {
+    $webClient.Dispose()
+}
 
 Write-Host "Installing Git (silent)"
 Start-Process -FilePath $GitInstallerPath -ArgumentList "/VERYSILENT","/NORESTART","/NOCANCEL","/SP-","/CLOSEAPPLICATIONS","/RESTARTAPPLICATIONS","/COMPONENTS=icons,ext\reg\shellhere,assoc,assoc_sh" -Wait -NoNewWindow
@@ -53,6 +58,30 @@ Remove-Item -Path $GitInstallerPath -Force
 # Reload PATH to pick up git
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + `
             [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+# ---------------------------------------------------------------------------
+# GitHub Actions Runner Agent
+# ---------------------------------------------------------------------------
+Write-Host ">>> Installing GitHub Actions runner agent $RunnerVersion"
+
+$RunnerZip = "actions-runner-win-x64-$RunnerVersion.zip"
+$RunnerUrl = "https://github.com/actions/runner/releases/download/v$RunnerVersion/$RunnerZip"
+$RunnerZipPath = "$env:TEMP\$RunnerZip"
+
+Write-Host "Downloading $RunnerUrl"
+$webClient = New-Object System.Net.WebClient
+try {
+    $webClient.DownloadFile($RunnerUrl, $RunnerZipPath)
+} finally {
+    $webClient.Dispose()
+}
+
+Write-Host "Extracting to $RunnerHome"
+New-Item -ItemType Directory -Path $RunnerHome -Force | Out-Null
+Expand-Archive -Path $RunnerZipPath -DestinationPath $RunnerHome -Force
+Remove-Item -Path $RunnerZipPath -Force
+
+Write-Host "Runner agent installed"
 
 # ---------------------------------------------------------------------------
 # Docker CE (static binaries from Docker)
@@ -69,7 +98,12 @@ $DockerUrl = "https://download.docker.com/win/static/stable/x86_64/$DockerZip"
 $DockerZipPath = "$env:TEMP\$DockerZip"
 
 Write-Host "Downloading $DockerUrl"
-Invoke-WebRequest -Uri $DockerUrl -OutFile $DockerZipPath -UseBasicParsing
+$webClient = New-Object System.Net.WebClient
+try {
+    $webClient.DownloadFile($DockerUrl, $DockerZipPath)
+} finally {
+    $webClient.Dispose()
+}
 
 Write-Host "Extracting to $env:ProgramFiles"
 Expand-Archive -Path $DockerZipPath -DestinationPath $env:ProgramFiles -Force

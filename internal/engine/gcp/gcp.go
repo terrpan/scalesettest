@@ -15,6 +15,9 @@ import (
 
 	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/terrpan/scaleset/internal/engine"
@@ -67,6 +70,9 @@ type Engine struct {
 
 	mu        sync.Mutex
 	instances map[string]string // runner name -> instance name
+
+	// OpenTelemetry instrumentation
+	tracer trace.Tracer
 }
 
 // Compile-time check that Engine satisfies the engine.Engine interface.
@@ -108,6 +114,7 @@ func New(ctx context.Context, cfg Config, logger *slog.Logger) (*Engine, error) 
 		cfg:       cfg,
 		logger:    logger,
 		instances: make(map[string]string),
+		tracer:    otel.Tracer("scaleset/engine/gcp"),
 	}, nil
 }
 
@@ -115,6 +122,16 @@ func New(ctx context.Context, cfg Config, logger *slog.Logger) (*Engine, error) 
 // runner with the provided JIT configuration.  The JIT config is passed
 // via instance metadata so the startup script can read it.
 func (e *Engine) StartRunner(ctx context.Context, name string, jitConfig string) (string, error) {
+	ctx, span := e.tracer.Start(ctx, "engine.gcp.StartRunner")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("runner.name", name),
+		attribute.String("gcp.project", e.cfg.Project),
+		attribute.String("gcp.zone", e.cfg.Zone),
+		attribute.String("gcp.machine_type", e.cfg.MachineType),
+	)
+
 	machineType := fmt.Sprintf("zones/%s/machineTypes/%s", e.cfg.Zone, e.cfg.MachineType)
 
 	// Boot disk from the pre-built runner image.
@@ -189,6 +206,7 @@ func (e *Engine) StartRunner(ctx context.Context, name string, jitConfig string)
 	}
 
 	// Wait for the insert operation to complete.
+	span.AddEvent("waiting for GCP operation")
 	if err := op.Wait(ctx); err != nil {
 		return "", fmt.Errorf("waiting for instance %s: %w", name, err)
 	}
@@ -196,6 +214,8 @@ func (e *Engine) StartRunner(ctx context.Context, name string, jitConfig string)
 	e.mu.Lock()
 	e.instances[name] = name
 	e.mu.Unlock()
+
+	span.SetAttributes(attribute.String("gcp.instance_name", name))
 
 	e.logger.Info("runner VM started",
 		slog.String("name", name),
@@ -209,6 +229,15 @@ func (e *Engine) StartRunner(ctx context.Context, name string, jitConfig string)
 // DestroyRunner permanently deletes the VM identified by id.
 // It is idempotent -- deleting an already-deleted VM is not an error.
 func (e *Engine) DestroyRunner(ctx context.Context, id string) error {
+	ctx, span := e.tracer.Start(ctx, "engine.gcp.DestroyRunner")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("gcp.instance_name", id),
+		attribute.String("gcp.project", e.cfg.Project),
+		attribute.String("gcp.zone", e.cfg.Zone),
+	)
+
 	e.logger.Info("destroying runner VM", slog.String("name", id))
 
 	op, err := e.client.Delete(ctx, &computepb.DeleteInstanceRequest{
@@ -220,6 +249,7 @@ func (e *Engine) DestroyRunner(ctx context.Context, id string) error {
 		// Treat "not found" as success -- the instance is already gone.
 		// The GCP client returns a googleapi.Error with Code 404.
 		if isNotFound(err) {
+			span.AddEvent("instance already deleted (idempotent)")
 			e.logger.Info("runner VM already deleted", slog.String("name", id))
 			e.removeFromTracking(id)
 			return nil
@@ -230,6 +260,7 @@ func (e *Engine) DestroyRunner(ctx context.Context, id string) error {
 	if err := op.Wait(ctx); err != nil {
 		// Also handle 404 during wait -- race between delete and check.
 		if isNotFound(err) {
+			span.AddEvent("instance already deleted during wait (idempotent)")
 			e.logger.Info("runner VM already deleted", slog.String("name", id))
 			e.removeFromTracking(id)
 			return nil
@@ -245,12 +276,17 @@ func (e *Engine) DestroyRunner(ctx context.Context, id string) error {
 
 // Shutdown deletes all VMs currently tracked by this engine instance.
 func (e *Engine) Shutdown(ctx context.Context) error {
+	ctx, span := e.tracer.Start(ctx, "engine.gcp.Shutdown")
+	defer span.End()
+
 	e.mu.Lock()
 	snapshot := make(map[string]string, len(e.instances))
 	for k, v := range e.instances {
 		snapshot[k] = v
 	}
 	e.mu.Unlock()
+
+	span.SetAttributes(attribute.Int("gcp.instances_count", len(snapshot)))
 
 	var firstErr error
 	for name, id := range snapshot {

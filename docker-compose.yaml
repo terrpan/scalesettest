@@ -1,0 +1,70 @@
+# Docker Compose file for local development with Aspire Dashboard
+#
+# The Aspire Dashboard provides a beautiful UI for viewing OpenTelemetry
+# traces, metrics, and logs from your scaleset daemon.
+#
+# Usage:
+#   docker compose up -d              # Start the dashboard
+#   docker compose logs -f            # View logs (includes login token if auth is enabled)
+#   docker compose down               # Stop and remove containers
+#
+# Access the dashboard at: http://localhost:18888
+
+services:
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: aspire-dashboard
+    
+    ports:
+      # Dashboard web UI
+      - "18888:18888"
+      
+      # OTLP/HTTP endpoint for receiving telemetry
+      # Maps the standard OTLP/HTTP port 4318 to the dashboard's internal port 18890
+      - "4318:18890"
+    
+    environment:
+      # Allow anonymous access (no login required) for local development.
+      # For production, remove this and use ASPIRE_DASHBOARD_OTLP_AUTHMODE with API keys.
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+      
+      # Enable the OTLP/HTTP endpoint inside the container.
+      # By default, only OTLP/gRPC (port 18889) is enabled.
+      # This setting activates the HTTP endpoint on port 18890.
+      ASPIRE_DASHBOARD_OTLP_HTTP_ENDPOINT_URL: "http://0.0.0.0:18890"
+      
+      # Optional: Increase telemetry limits for longer-running tests
+      # (default: 10,000 logs/traces, 50,000 metrics per resource)
+      # DASHBOARD__TELEMETRYLIMITS__MAXLOGCOUNT: "50000"
+      # DASHBOARD__TELEMETRYLIMITS__MAXTRACECOUNT: "50000"
+      # DASHBOARD__TELEMETRYLIMITS__MAXMETRICSCOUNT: "100000"
+    
+    restart: unless-stopped
+    
+    # Optional: Persist dashboard configuration across container restarts
+    # volumes:
+    #   - ./aspire-dashboard-config.json:/app/config.json:ro
+
+# Configuration notes:
+#
+# 1. Your scaleset OTEL configuration (in config.yaml):
+#    otel:
+#      enabled: true
+#      endpoint: "localhost:4318"    # Maps to dashboard's OTLP/HTTP endpoint
+#      insecure: true                # Plain HTTP (ok for local dev)
+#
+# 2. The dashboard stores telemetry in-memory. When you restart the container,
+#    all telemetry is lost. This is by design for local development.
+#
+# 3. To secure the dashboard (production):
+#    - Remove ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS
+#    - Set ASPIRE_DASHBOARD_OTLP_AUTHMODE: "ApiKey"
+#    - Set ASPIRE_DASHBOARD_OTLP_PRIMARYAPIKEY: "<your-api-key>"
+#    - Configure your app to send the x-otlp-api-key header
+#
+# 4. The dashboard UI is at http://localhost:18888
+#    Features available:
+#    - Structured logs with filtering and search
+#    - Distributed traces with flame graphs
+#    - Metrics with time-series charts
+#    - Resources page (disabled in standalone mode)

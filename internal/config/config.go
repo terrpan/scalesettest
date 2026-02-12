@@ -29,6 +29,7 @@ type Config struct {
 	ScaleSet ScaleSetConfig `yaml:"scaleset"`
 	Engine   EngineConfig   `yaml:"engine"`
 	Logging  LoggingConfig  `yaml:"logging"`
+	OTel     OTelConfig     `yaml:"otel"`
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,27 @@ type LoggingConfig struct {
 }
 
 // ---------------------------------------------------------------------------
+// OpenTelemetry
+// ---------------------------------------------------------------------------
+
+// OTelConfig controls OpenTelemetry tracing and metrics.
+type OTelConfig struct {
+	// Enabled controls whether OpenTelemetry is active.  Default: false.
+	Enabled bool `yaml:"enabled"`
+
+	// Endpoint is the OTLP HTTP endpoint (e.g. "localhost:4318").
+	// If empty, falls back to OTEL_EXPORTER_OTLP_ENDPOINT env var.
+	// Default: "" (uses OTEL env vars).
+	Endpoint string `yaml:"endpoint"`
+
+	// Insecure enables plain HTTP (no TLS) for OTLP export.  Default: true.
+	Insecure bool `yaml:"insecure"`
+
+	// StdOut also prints traces and metrics to stdout (for debugging).  Default: false.
+	StdOut bool `yaml:"stdout"`
+}
+
+// ---------------------------------------------------------------------------
 // Loading
 // ---------------------------------------------------------------------------
 
@@ -210,6 +232,13 @@ func (c *Config) ApplyDefaults() {
 	}
 	if c.Logging.Format == "" {
 		c.Logging.Format = "text"
+	}
+	// OTel defaults: disabled by default, insecure=true for local dev
+	if !c.OTel.Enabled {
+		// If explicitly disabled, ensure insecure defaults to true for when enabled
+		if c.OTel.Insecure == false && c.OTel.Endpoint == "" {
+			c.OTel.Insecure = true
+		}
 	}
 }
 

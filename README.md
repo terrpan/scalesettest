@@ -203,6 +203,37 @@ engine:
     # service_account: "runner@my-project.iam.gserviceaccount.com"  # optional
 ```
 
+## OpenTelemetry
+
+The daemon is instrumented with OpenTelemetry (traces + metrics). A
+`docker-compose.yaml` is included that starts the
+[Aspire Dashboard](https://aspire.dev/dashboard/standalone/) as a local
+OTLP receiver and UI.
+
+```bash
+docker compose up -d          # start dashboard at http://localhost:18888
+./scaleset --config config.yaml
+```
+
+Enable in `config.yaml`:
+
+```yaml
+otel:
+  enabled: true
+  endpoint: "localhost:4318"
+  insecure: true
+```
+
+**Metrics:** `scaleset.runners.idle`, `scaleset.runners.busy`,
+`scaleset.runners.started`, `scaleset.runners.destroyed`,
+`scaleset.jobs.completed` (by result), `scaleset.scale.events` (by action),
+`scaleset.runner.startup.duration` (histogram).
+
+**Traces:** `scaler.HandleDesiredRunnerCount`, `scaler.startRunner`,
+`scaler.HandleJobStarted`, `scaler.HandleJobCompleted`,
+`engine.{docker,gcp}.StartRunner`, `engine.{docker,gcp}.DestroyRunner`,
+`engine.{docker,gcp}.Shutdown`.
+
 ## Targeting the scale set in workflows
 
 ```yaml

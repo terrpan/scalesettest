@@ -12,6 +12,9 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	dockerclient "github.com/docker/docker/client"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/terrpan/scaleset/internal/engine"
 )
@@ -45,6 +48,9 @@ type Engine struct {
 
 	mu         sync.Mutex
 	containers map[string]string // name -> containerID
+
+	// OpenTelemetry instrumentation
+	tracer trace.Tracer
 }
 
 // Compile-time check that Engine satisfies the engine.Engine interface.
@@ -87,12 +93,22 @@ func New(ctx context.Context, cfg Config, logger *slog.Logger) (*Engine, error) 
 		dind:       cfg.Dind,
 		logger:     logger,
 		containers: make(map[string]string),
+		tracer:     otel.Tracer("scaleset/engine/docker"),
 	}, nil
 }
 
 // StartRunner creates and starts a Docker container that runs a
 // GitHub Actions runner with the provided JIT configuration.
 func (e *Engine) StartRunner(ctx context.Context, name string, jitConfig string) (string, error) {
+	ctx, span := e.tracer.Start(ctx, "engine.docker.StartRunner")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("runner.name", name),
+		attribute.String("docker.image", e.image),
+		attribute.Bool("docker.dind", e.dind),
+	)
+
 	env := []string{
 		fmt.Sprintf("ACTIONS_RUNNER_INPUT_JITCONFIG=%s", jitConfig),
 	}
@@ -146,6 +162,8 @@ func (e *Engine) StartRunner(ctx context.Context, name string, jitConfig string)
 	e.containers[name] = resp.ID
 	e.mu.Unlock()
 
+	span.SetAttributes(attribute.String("docker.container_id", resp.ID))
+
 	e.logger.Info("runner started",
 		slog.String("name", name),
 		slog.String("containerID", resp.ID),
@@ -157,6 +175,11 @@ func (e *Engine) StartRunner(ctx context.Context, name string, jitConfig string)
 // DestroyRunner force-removes the container identified by id,
 // permanently destroying the ephemeral runner.
 func (e *Engine) DestroyRunner(ctx context.Context, id string) error {
+	ctx, span := e.tracer.Start(ctx, "engine.docker.DestroyRunner")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("docker.container_id", id))
+
 	e.logger.Info("destroying runner", slog.String("containerID", id))
 
 	if err := e.client.ContainerRemove(ctx, id, container.RemoveOptions{Force: true}); err != nil {
@@ -178,12 +201,17 @@ func (e *Engine) DestroyRunner(ctx context.Context, id string) error {
 
 // Shutdown force-removes every container this engine is tracking.
 func (e *Engine) Shutdown(ctx context.Context) error {
+	ctx, span := e.tracer.Start(ctx, "engine.docker.Shutdown")
+	defer span.End()
+
 	e.mu.Lock()
 	snapshot := make(map[string]string, len(e.containers))
 	for k, v := range e.containers {
 		snapshot[k] = v
 	}
 	e.mu.Unlock()
+
+	span.SetAttributes(attribute.Int("docker.containers_count", len(snapshot)))
 
 	var firstErr error
 	for name, id := range snapshot {

@@ -120,7 +120,7 @@ variable "tags" {
 variable "dism_cleanup" {
   type        = bool
   default     = false
-  description = "Run DISM /ResetBase cleanup to shrink image size. Saves ~2 GB but adds 20-40 min to build time. Not needed for ephemeral runners."
+  description = "Run DISM /ResetBase cleanup to shrink image size. Saves ~2 GB but adds 20-40 min to build time. Not needed for testing since the image is boot-optimized (no need to minimize boot disk size). Recommended for production images to reduce storage costs."
 }
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/actions/scaleset"
 	"github.com/actions/scaleset/listener"
@@ -14,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/terrpan/scaleset/internal/config"
+	"github.com/terrpan/scaleset/internal/otel"
 	"github.com/terrpan/scaleset/internal/scaler"
 )
 
@@ -137,6 +139,30 @@ func run(ctx context.Context) error {
 	)
 
 	// ---------------------------------------------------------------
+	// 2.5. Initialize OpenTelemetry (if enabled)
+	// ---------------------------------------------------------------
+	if cfg.OTel.Enabled {
+		otelShutdown, err := otel.SetupOTelSDK(ctx, "scaleset", otel.Config{
+			Enabled:  cfg.OTel.Enabled,
+			Endpoint: cfg.OTel.Endpoint,
+			Insecure: cfg.OTel.Insecure,
+			StdOut:   cfg.OTel.StdOut,
+		})
+		if err != nil {
+			return fmt.Errorf("setting up OpenTelemetry: %w", err)
+		}
+		defer func() {
+			if err := otelShutdown(context.WithoutCancel(ctx)); err != nil {
+				logger.Error("OpenTelemetry shutdown error", slog.String("error", err.Error()))
+			}
+		}()
+		logger.Info("OpenTelemetry initialized",
+			slog.String("endpoint", cfg.OTel.Endpoint),
+			slog.Bool("insecure", cfg.OTel.Insecure),
+		)
+	}
+
+	// ---------------------------------------------------------------
 	// 3. Create scaleset client
 	// ---------------------------------------------------------------
 	scalesetClient, err := cfg.NewScalesetClient()
@@ -160,21 +186,41 @@ func run(ctx context.Context) error {
 	}
 
 	// ---------------------------------------------------------------
-	// 5. Create runner scale set
+	// 5. Create or get existing runner scale set
 	// ---------------------------------------------------------------
-	scaleSet, err := scalesetClient.CreateRunnerScaleSet(ctx, &scaleset.RunnerScaleSet{
+	desiredScaleSet := &scaleset.RunnerScaleSet{
 		Name:          cfg.ScaleSet.Name,
 		RunnerGroupID: runnerGroupID,
 		Labels:        cfg.BuildLabels(),
 		RunnerSetting: scaleset.RunnerSetting{
 			DisableUpdate: true,
 		},
-	})
-	if err != nil {
-		return fmt.Errorf("creating runner scale set: %w", err)
 	}
 
-	logger.Info("runner scale set created",
+	scaleSet, err := scalesetClient.CreateRunnerScaleSet(ctx, desiredScaleSet)
+	if err != nil {
+		// If the scale set already exists, get the existing one and update it.
+		if !strings.Contains(err.Error(), "ExistsException") {
+			return fmt.Errorf("creating runner scale set: %w", err)
+		}
+
+		logger.Info("runner scale set already exists, reusing",
+			slog.String("name", cfg.ScaleSet.Name),
+		)
+
+		scaleSet, err = scalesetClient.GetRunnerScaleSet(ctx, runnerGroupID, cfg.ScaleSet.Name)
+		if err != nil {
+			return fmt.Errorf("getting existing runner scale set: %w", err)
+		}
+
+		// Update the existing scale set to ensure labels and settings are current.
+		scaleSet, err = scalesetClient.UpdateRunnerScaleSet(ctx, scaleSet.ID, desiredScaleSet)
+		if err != nil {
+			return fmt.Errorf("updating runner scale set: %w", err)
+		}
+	}
+
+	logger.Info("runner scale set ready",
 		slog.Int("scaleSetID", scaleSet.ID),
 		slog.String("name", scaleSet.Name),
 	)
