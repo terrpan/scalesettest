@@ -132,21 +132,26 @@ func run(ctx context.Context) error {
 	logger := cfg.NewLogger()
 	logger.Info("configuration loaded",
 		slog.String("configFile", cfgPath),
-		slog.String("engine", cfg.Engine.Type),
+		slog.String("engine", cfg.Engine.EnabledEngine()),
 		slog.String("scaleSetName", cfg.ScaleSet.Name),
 		slog.Int("minRunners", cfg.ScaleSet.MinRunners),
 		slog.Int("maxRunners", cfg.ScaleSet.MaxRunners),
 	)
 
 	// ---------------------------------------------------------------
-	// 2.5. Initialize OpenTelemetry (if enabled)
+	// 2.5. Initialize OpenTelemetry / Prometheus (if enabled)
 	// ---------------------------------------------------------------
-	if cfg.OTel.Enabled {
+	if cfg.OTel.Enabled || cfg.Prometheus.Enable {
+		promPort := 0
+		if cfg.Prometheus.Enable {
+			promPort = cfg.Prometheus.Port
+		}
 		otelShutdown, err := otel.SetupOTelSDK(ctx, "scaleset", otel.Config{
-			Enabled:  cfg.OTel.Enabled,
-			Endpoint: cfg.OTel.Endpoint,
-			Insecure: cfg.OTel.Insecure,
-			StdOut:   cfg.OTel.StdOut,
+			Enabled:        cfg.OTel.Enabled,
+			Endpoint:       cfg.OTel.Endpoint,
+			Insecure:       cfg.OTel.Insecure,
+			StdOut:         cfg.OTel.StdOut,
+			PrometheusPort: promPort,
 		})
 		if err != nil {
 			return fmt.Errorf("setting up OpenTelemetry: %w", err)
@@ -156,10 +161,17 @@ func run(ctx context.Context) error {
 				logger.Error("OpenTelemetry shutdown error", slog.String("error", err.Error()))
 			}
 		}()
-		logger.Info("OpenTelemetry initialized",
-			slog.String("endpoint", cfg.OTel.Endpoint),
-			slog.Bool("insecure", cfg.OTel.Insecure),
-		)
+		if cfg.OTel.Enabled {
+			logger.Info("OpenTelemetry initialized",
+				slog.String("endpoint", cfg.OTel.Endpoint),
+				slog.Bool("insecure", cfg.OTel.Insecure),
+			)
+		}
+		if cfg.Prometheus.Enable {
+			logger.Info("Prometheus metrics endpoint started",
+				slog.String("endpoint", fmt.Sprintf("http://0.0.0.0:%d/metrics", cfg.Prometheus.Port)),
+			)
+		}
 	}
 
 	// ---------------------------------------------------------------

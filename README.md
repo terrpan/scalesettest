@@ -151,8 +151,8 @@ container actions, etc.), enable DinD in the config:
 
 ```yaml
 engine:
-  type: "docker"
   docker:
+    enable: true
     image: "ghcr.io/actions/actions-runner:latest"
     dind: true
 ```
@@ -190,8 +190,8 @@ including WIF step-by-step instructions.
 
 ```yaml
 engine:
-  type: "gcp"
   gcp:
+    enable: true
     project: "my-project"
     zone: "us-central1-a"
     image: "projects/my-project/global/images/family/scaleset-runner"
@@ -233,6 +233,44 @@ otel:
 `scaler.HandleJobStarted`, `scaler.HandleJobCompleted`,
 `engine.{docker,gcp}.StartRunner`, `engine.{docker,gcp}.DestroyRunner`,
 `engine.{docker,gcp}.Shutdown`.
+
+## Prometheus
+
+The daemon can expose a `/metrics` endpoint for Prometheus scraping,
+independently of the OTLP tracing pipeline. You can use Prometheus alone,
+OTLP alone, or both together.
+
+| `otel.enabled` | `prometheus.enable` | What happens |
+|:-:|:-:|:--|
+| `false` | `false` | No telemetry |
+| `false` | `true`  | Prometheus `/metrics` endpoint only (no traces) |
+| `true`  | `false` | OTLP push (traces + metrics), no scrape endpoint |
+| `true`  | `true`  | Both: OTLP push + Prometheus scrape endpoint |
+
+Enable in `config.yaml`:
+
+```yaml
+prometheus:
+  enable: true
+  port: 9090        # default
+```
+
+A `prometheus.yml` scrape config and a Prometheus service in
+`docker-compose.yaml` are included:
+
+```bash
+docker compose up -d prometheus   # Prometheus UI at http://localhost:9091
+./scaleset --config config.yaml
+```
+
+The scrape target uses `host.docker.internal:9090` so Prometheus running
+in Docker can reach the scaleset daemon on the host.
+
+All OTEL metrics are automatically available in Prometheus format:
+`scaleset_runners_idle`, `scaleset_runners_busy`,
+`scaleset_runners_started_total`, `scaleset_runners_destroyed_total`,
+`scaleset_jobs_completed_total`, `scaleset_scale_events_total`,
+`scaleset_runner_startup_duration_seconds`.
 
 ## Targeting the scale set in workflows
 

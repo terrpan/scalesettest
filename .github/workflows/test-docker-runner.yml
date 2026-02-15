@@ -1,4 +1,4 @@
-name: CI
+name: Test Docker Runner
 
 on:
   workflow_dispatch:
