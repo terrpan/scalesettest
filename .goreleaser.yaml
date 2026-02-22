@@ -41,7 +41,7 @@ kos:
       - linux/amd64
       - linux/arm64
     repositories:
-      - ghcr.io/terrpan/scalesettest/scaleset
+      - ghcr.io/terrpan/scaleset/scaleset
     tags:
       - "{{.Tag}}"
       - "{{if not .Prerelease}}latest{{end}}"
@@ -50,8 +50,8 @@ kos:
     labels:
       org.opencontainers.image.title: scaleset
       org.opencontainers.image.description: GitHub Actions Runner Scale Set autoscaler
-      org.opencontainers.image.url: https://github.com/terrpan/scalesettest
-      org.opencontainers.image.source: https://github.com/terrpan/scalesettest
+      org.opencontainers.image.url: https://github.com/terrpan/scaleset
+      org.opencontainers.image.source: https://github.com/terrpan/scaleset
       org.opencontainers.image.version: "{{.Tag}}"
       org.opencontainers.image.revision: "{{.FullCommit}}"
       org.opencontainers.image.licenses: MIT
@@ -114,7 +114,7 @@ changelog:
 release:
   github:
     owner: terrpan
-    name: scalesettest
+    name: scaleset
   draft: false
   prerelease: auto
   name_template: "{{.Tag}}"
@@ -122,7 +122,7 @@ release:
     ## Container Image
 
     ```
-    docker pull ghcr.io/terrpan/scalesettest/scaleset:{{.Tag}}
+    docker pull ghcr.io/terrpan/scaleset/scaleset:{{.Tag}}
     ```
 
     ## Install Binary
@@ -130,14 +130,10 @@ release:
     Download the standalone binary (no extraction needed):
     ```bash
     # Linux amd64
-    curl -Lo scaleset https://github.com/terrpan/scalesettest/releases/download/{{.Tag}}/scaleset_linux_amd64
+    curl -Lo scaleset https://github.com/terrpan/scaleset/releases/download/{{.Tag}}/scaleset_linux_amd64
     chmod +x scaleset
 
     # Linux arm64
-    curl -Lo scaleset https://github.com/terrpan/scalesettest/releases/download/{{.Tag}}/scaleset_linux_arm64
+    curl -Lo scaleset https://github.com/terrpan/scaleset/releases/download/{{.Tag}}/scaleset_linux_arm64
     chmod +x scaleset
     ```
-
-    ## Verify SBOM
-
-    The container image includes an embedded SPDX SBOM.

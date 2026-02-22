@@ -96,7 +96,7 @@ Runs `goreleaser release --snapshot --clean` to validate the full release pipeli
 
 **On pushes to `main`:**
 - Builds snapshot binaries and container images locally
-- Pushes a dev snapshot image to GHCR tagged with the short commit SHA (e.g., `ghcr.io/terrpan/scalesettest/scaleset:abc1234`)
+- Pushes a dev snapshot image to GHCR tagged with the short commit SHA (e.g., `ghcr.io/terrpan/scaleset/scaleset:abc1234`)
 - Triggers the vulnerability scan job
 
 #### 2. **Vulnerability Scan** (main only)
@@ -235,7 +235,7 @@ Builds, packages, and publishes the release:
 - Built with **Ko** (no Dockerfile) via GoReleaser's `kos` integration
 - Multi-arch manifest (`linux/amd64` + `linux/arm64`)
 - Base image: `cgr.dev/chainguard/static` (distroless, minimal attack surface)
-- Pushed to GHCR: `ghcr.io/terrpan/scalesettest/scaleset:v0.3.0` + `:latest`
+- Pushed to GHCR: `ghcr.io/terrpan/scaleset/scaleset:v0.3.0` + `:latest`
 - **SBOM embedded** in the image (SPDX format) — Ko generates and attaches the SBOM automatically
 
 **Build Info:**
@@ -250,7 +250,7 @@ Builds, packages, and publishes the release:
 **Build Attestation:**
 - **SLSA provenance** attestation generated and pushed to GHCR
 - Links the image to the exact workflow run, commit, and build environment
-- Verify with: `gh attestation verify oci://ghcr.io/terrpan/scalesettest/scaleset:v0.3.0 --owner terrpan`
+- Verify with: `gh attestation verify oci://ghcr.io/terrpan/scaleset/scaleset:v0.3.0 --owner terrpan`
 
 #### 2. **Vulnerability Scan**
 
@@ -274,7 +274,7 @@ Runs after GoReleaser succeeds and uploads results to the **Security** tab under
 
 ```bash
 # List all tags for the scaleset package (includes SBOM tags)
-crane ls ghcr.io/terrpan/scalesettest/scaleset
+crane ls ghcr.io/terrpan/scaleset/scaleset
 
 # Example output:
 # v0.3.0
@@ -285,13 +285,13 @@ crane ls ghcr.io/terrpan/scalesettest/scaleset
 
 ```bash
 # Pull the SBOM artifact
-crane export ghcr.io/terrpan/scalesettest/scaleset:sha256-<digest>.sbom | tar -xOf - sbom.spdx.json | jq
+crane export ghcr.io/terrpan/scaleset/scaleset:sha256-<digest>.sbom | tar -xOf - sbom.spdx.json | jq
 ```
 
 Or use **cosign** to inspect the supply chain:
 
 ```bash
-cosign tree ghcr.io/terrpan/scalesettest/scaleset:v0.3.0
+cosign tree ghcr.io/terrpan/scaleset/scaleset:v0.3.0
 ```
 
 ---
@@ -387,7 +387,7 @@ Here's the full flow from code change to published release:
 │  Published Release                                              │
 │  ────────────────────────────────────────────────────────────   │
 │  • GitHub Release: https://github.com/.../releases/tag/v0.3.0   │
-│  • Container: ghcr.io/terrpan/scalesettest/scaleset:v0.3.0      │
+│  • Container: ghcr.io/terrpan/scaleset/scaleset:v0.3.0          │
 │  • Binaries: scaleset_linux_amd64, scaleset_linux_arm64         │
 │  • Checksums: checksums.txt                                     │
 │  • SBOM: embedded in image + pushed as GHCR artifact            │

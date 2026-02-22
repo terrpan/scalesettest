@@ -62,7 +62,7 @@ jobs:
         run: |
           # GoReleaser snapshot builds the image locally but doesn't push.
           # Push the snapshot image to GHCR for dev/testing.
-          IMAGE="ghcr.io/terrpan/scalesettest/scaleset"
+          IMAGE="ghcr.io/terrpan/scaleset/scaleset"
           SHA="${{ github.sha }}"
           SHORT_SHA="${SHA:0:7}"
 
