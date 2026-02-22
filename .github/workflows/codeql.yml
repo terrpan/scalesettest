@@ -1,0 +1,53 @@
+name: "CodeQL — SAST"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run every Monday at 06:00 UTC to catch new advisories.
+    - cron: "0 6 * * 1"
+
+# Default to read-only permissions.
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # upload SARIF results
+      actions: read           # required for private repos
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Default to read-only permissions; jobs override as needed.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: latest
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 14
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always
