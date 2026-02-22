@@ -5,10 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -19,6 +17,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+
+	"github.com/terrpan/scaleset/internal/buildinfo"
 )
 
 // Config holds OpenTelemetry configuration.
@@ -36,10 +36,10 @@ type Config struct {
 	// StdOut also prints traces and metrics to stdout (for debugging).
 	StdOut bool
 
-	// PrometheusPort, when > 0, starts an HTTP server on this port
-	// serving a /metrics endpoint for Prometheus scraping.
-	// This works independently of Enabled -- you can use Prometheus
-	// without OTLP push, or both together.
+	// PrometheusPort, when > 0, enables a Prometheus metric reader.
+	// The HTTP server serving /metrics should be created separately by the
+	// application (e.g., in main.go). This configuration value is used to
+	// signal that Prometheus metrics should be collected and exported.
 	PrometheusPort int
 }
 
@@ -48,11 +48,15 @@ type Config struct {
 //
 // The function sets up providers based on what is enabled:
 //   - cfg.Enabled: OTLP push for traces and metrics
-//   - cfg.PrometheusPort > 0: Prometheus /metrics scrape endpoint
+//   - cfg.PrometheusPort > 0: Prometheus metric reader
 //   - Both can be active simultaneously
 //
+// Note: The HTTP server for the Prometheus /metrics endpoint should be created
+// and managed separately by the application (e.g., in main.go). This function
+// only creates the metric reader that will export metrics for Prometheus scraping.
+//
 // The shutdown function should be called with defer to ensure proper cleanup
-// of exporters, providers, and the Prometheus HTTP server.
+// of exporters and providers.
 func SetupOTelSDK(
 	ctx context.Context,
 	serviceName string,
@@ -81,7 +85,7 @@ func SetupOTelSDK(
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceName(serviceName),
-			semconv.ServiceVersion("0.1.0"),
+			semconv.ServiceVersion(buildinfo.Version),
 		),
 	)
 	if err != nil {
@@ -110,24 +114,6 @@ func SetupOTelSDK(
 		}
 		shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
 		otel.SetMeterProvider(meterProvider)
-	}
-
-	// Start Prometheus HTTP server if configured.
-	if cfg.PrometheusPort > 0 {
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.Handler())
-		srv := &http.Server{
-			Addr:    fmt.Sprintf(":%d", cfg.PrometheusPort),
-			Handler: mux,
-		}
-		go func() {
-			if srvErr := srv.ListenAndServe(); srvErr != nil && !errors.Is(srvErr, http.ErrServerClosed) {
-				// Log is not available here; the error will surface
-				// if something is already listening on the port.
-				fmt.Printf("prometheus /metrics server error: %v\n", srvErr)
-			}
-		}()
-		shutdownFuncs = append(shutdownFuncs, srv.Shutdown)
 	}
 
 	return

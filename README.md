@@ -30,8 +30,52 @@ and is then permanently destroyed.
 
 ## Build
 
+### Local binary
+
 ```bash
 go build ./cmd/scaleset
+./scaleset --version  # Shows "dev" (default when not built with ldflags)
+```
+
+### Container image with ko
+
+[ko](https://ko.build) is a fast, simple container image builder for Go applications. It compiles your Go binary directly and packages it without needing Docker.
+
+**Install ko:**
+
+```bash
+go install github.com/ko-build/ko@latest
+```
+
+**Build and push a container image:**
+
+```bash
+export KO_DOCKER_REPO=ghcr.io/your-username/scaleset
+ko build github.com/terrpan/scaleset/cmd/scaleset
+# Output: ghcr.io/your-username/scaleset:abc1234
+```
+
+**With version tags** (recommended for releases):
+
+```bash
+git tag v0.2.0
+ko build github.com/terrpan/scaleset/cmd/scaleset
+# Automatically injects version v0.2.0, commit hash, and build timestamp
+```
+
+The `.ko.yaml` config file controls build settings:
+- **Base image:** `cgr.dev/chainguard/static` (distroless, minimal)
+- **ldflags:** automatically injects `buildinfo` package variables from git metadata:
+  - `Version` ← git tag (e.g., `v0.2.0`)
+  - `Commit` ← git short commit hash
+  - `BuildTime` ← UTC build timestamp
+
+**Check the injected version:**
+
+```bash
+ko build github.com/terrpan/scaleset/cmd/scaleset --local  # Build to local Docker
+docker run ghcr.io/your-username/scaleset:abc1234 --version
+# scaleset version v0.2.0
 ```
 
 ## Configuration

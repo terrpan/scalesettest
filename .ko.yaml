@@ -1,0 +1,20 @@
+# ko build configuration
+# https://ko.build/configuration/
+
+# Use distroless base image for minimal container size
+defaultBaseImage: cgr.dev/chainguard/static
+
+# Global ldflags applied to all builds
+ldflags:
+  # Strip binaries and disable DWARF debug info for smaller images
+  - -s -w
+  # Inject build metadata at link time
+  # Format: -X import/path.VarName=value
+  - -X github.com/terrpan/scaleset/internal/buildinfo.Version={{.Git.Tag}}
+  - -X github.com/terrpan/scaleset/internal/buildinfo.Commit={{.Git.ShortCommit}}
+  - -X github.com/terrpan/scaleset/internal/buildinfo.BuildTime={{.Date}}
+
+# Target platforms for multi-arch builds
+defaultPlatforms:
+- linux/arm64
+- linux/amd64
