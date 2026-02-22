@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write   # Required to push tags
+  actions: write    # Required to trigger release workflow
 
 concurrency:
   group: version
@@ -68,7 +69,17 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "${NEXT}" -m "${NEXT}"
           git push origin "${NEXT}"
-          echo "::notice::Pushed tag ${NEXT} — release workflow will trigger automatically"
+          echo "::notice::Pushed tag ${NEXT}"
+
+      # Tags pushed with GITHUB_TOKEN don't trigger other workflows.
+      # Explicitly dispatch the release workflow for the new tag.
+      - name: Trigger release workflow
+        if: steps.version.outputs.bump == 'true' && inputs.dry_run == false
+        run: |
+          gh workflow run release.yml --field tag="${{ steps.version.outputs.next }}"
+          echo "::notice::Triggered release workflow for ${{ steps.version.outputs.next }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Summary
         run: |
