@@ -64,6 +64,8 @@ jobs:
         if: steps.version.outputs.bump == 'true' && inputs.dry_run == false
         run: |
           NEXT="${{ steps.version.outputs.next }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "${NEXT}" -m "${NEXT}"
           git push origin "${NEXT}"
           echo "::notice::Pushed tag ${NEXT} — release workflow will trigger automatically"
