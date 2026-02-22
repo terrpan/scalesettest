@@ -80,7 +80,7 @@ jobs:
             DIGEST=$(echo "${ARTIFACTS}" | jq -r '[.[] | select(.type=="Docker Image")][0].extra.Digest // empty')
           fi
 
-          # MANIFEST_NAME looks like "ghcr.io/terrpan/scalesettest@sha256:abc..."
+          # MANIFEST_NAME looks like "ghcr.io/terrpan/scaleset@sha256:abc..."
           # Extract just the repository (everything before @)
           REPO="${MANIFEST_NAME%%@*}"
 
