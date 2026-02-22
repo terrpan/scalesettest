@@ -20,9 +20,9 @@ All workflows follow **least-privilege permissions** and use **concurrency contr
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| **CI** (`.github/workflows/ci.yml`) | PR, push to `main` | Lint, test, dependency review |
-| **Build** (`.github/workflows/build.yml`) | PR, push to `main` | GoReleaser snapshot builds, push dev images on `main` |
-| **CodeQL** (`.github/workflows/codeql.yml`) | PR, push to `main`, weekly schedule | Static application security testing (SAST) |
+| **CI** (`.github/workflows/ci.yml`) | PR to `main` | Lint, test, dependency review |
+| **Build** (`.github/workflows/build.yml`) | PR to `main` | GoReleaser snapshot build validation (dry-run) |
+| **CodeQL** (`.github/workflows/codeql.yml`) | PR to `main`, push to `main`, weekly schedule | Static application security testing (SAST) |
 | **Version** (`.github/workflows/version.yml`) | Manual (`workflow_dispatch`) | Determine next semver tag with `svu`, create tag, dispatch release workflow |
 | **Release** (`.github/workflows/release.yml`) | Tag push (`v*`), workflow dispatch | Build binaries, push multi-arch images, create GitHub Release, attest, scan |
 
@@ -35,7 +35,6 @@ All workflows follow **least-privilege permissions** and use **concurrency contr
 ### Triggers
 
 - Pull requests targeting `main`
-- Pushes to `main`
 
 ### Jobs
 
@@ -82,30 +81,20 @@ Runs only on pull requests (not on pushes to `main`).
 ### Triggers
 
 - Pull requests targeting `main`
-- Pushes to `main`
 
 ### Jobs
 
-#### 1. **Build & Push**
+#### **Build & Push**
 
 Runs `goreleaser release --snapshot --clean` to validate the full release pipeline without creating a GitHub Release.
 
-**On PRs:**
 - Dry-run build (no image push)
 - Validates GoReleaser config and build reproducibility
+- Ensures binaries and container images can be built successfully
 
-**On pushes to `main`:**
-- Builds snapshot binaries and container images locally
-- Pushes a dev snapshot image to GHCR tagged with the short commit SHA (e.g., `ghcr.io/terrpan/scaleset/scaleset:abc1234`)
-- Triggers the vulnerability scan job
+This workflow runs only on PRs to catch build issues before merging. Actual releases are handled by the Release workflow.
 
-#### 2. **Vulnerability Scan** (main only)
-
-Scans the snapshot image with **Trivy** and uploads results to GitHub Security:
-
-- **Formats:** JSON (artifact) + SARIF (Security tab)
-- **Severities:** CRITICAL, HIGH, MEDIUM
-- **Retention:** 90 days
+**Note:** The job is named "Build & Push" for branch protection compatibility, but no images are pushed to GHCR during PR checks.
 
 ---
 
@@ -117,7 +106,7 @@ Scans the snapshot image with **Trivy** and uploads results to GitHub Security:
 
 - Pull requests targeting `main`
 - Pushes to `main`
-- Weekly schedule (Sundays at 00:00 UTC)
+- Weekly schedule (Mondays at 06:00 UTC)
 
 ### Analysis
 
@@ -235,7 +224,10 @@ Builds, packages, and publishes the release:
 - Built with **Ko** (no Dockerfile) via GoReleaser's `kos` integration
 - Multi-arch manifest (`linux/amd64` + `linux/arm64`)
 - Base image: `cgr.dev/chainguard/static` (distroless, minimal attack surface)
-- Pushed to GHCR: `ghcr.io/terrpan/scaleset/scaleset:v0.3.0` + `:latest`
+- Pushed to GHCR with multiple tags:
+  - `:v0.3.0` (version tag)
+  - `:abc1234` (commit SHA)
+  - `:latest` (only for non-prerelease versions)
 - **SBOM embedded** in the image (SPDX format) — Ko generates and attaches the SBOM automatically
 
 **Build Info:**
@@ -345,11 +337,9 @@ Here's the full flow from code change to published release:
   │
   v
 ┌─────────────────────────────────────────────────────────────────┐
-│  CI Pipeline (main)                                             │
+│  Post-Merge (main)                                              │
 │  ────────────────────────────────────────────────────────────   │
-│  ✓ Lint, Test, CodeQL                                           │
-│  ✓ Build & Push snapshot image (ghcr.io/.../scaleset:abc1234)  │
-│  ✓ Vulnerability Scan (Trivy → Security tab)                    │
+│  ✓ CodeQL (SAST, weekly + on push)                             │
 └─────────────────────────────────────────────────────────────────┘
   │
   │  5. Developer decides it's time to release
@@ -375,7 +365,7 @@ Here's the full flow from code change to published release:
 │    • Create archives + checksums                                │
 │    • Build multi-arch container image with Ko                   │
 │    • Generate SBOM (SPDX, embedded in image)                    │
-│    • Push to GHCR (ghcr.io/.../scaleset:v0.3.0 + :latest)       │
+│    • Push to GHCR (:v0.3.0 + :abc1234 + :latest)                │
 │    • Generate grouped changelog from conventional commits       │
 │    • Create GitHub Release with binaries + instructions         │
 │  ✓ Attest build provenance (SLSA, pushed to registry)           │
@@ -387,7 +377,7 @@ Here's the full flow from code change to published release:
 │  Published Release                                              │
 │  ────────────────────────────────────────────────────────────   │
 │  • GitHub Release: https://github.com/.../releases/tag/v0.3.0   │
-│  • Container: ghcr.io/terrpan/scaleset/scaleset:v0.3.0          │
+│  • Container tags: :v0.3.0, :abc1234, :latest                   │
 │  • Binaries: scaleset_linux_amd64, scaleset_linux_arm64         │
 │  • Checksums: checksums.txt                                     │
 │  • SBOM: embedded in image + pushed as GHCR artifact            │

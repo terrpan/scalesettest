@@ -1,8 +1,6 @@
 name: Build
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -12,7 +10,7 @@ permissions:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -20,11 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write      # Push snapshot images to GHCR on main
-      id-token: write      # OIDC signing / attestation
-      attestations: write  # GitHub artifact attestations
-    outputs:
-      image: ${{ steps.image-ref.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,19 +29,10 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       # GoReleaser --snapshot validates the full release pipeline without
-      # publishing a GitHub release. On PRs this is a dry-run; on main pushes
-      # it builds and pushes a dev snapshot image to GHCR.
+      # publishing a GitHub release. This is a dry-run build to ensure the
+      # release configuration is valid.
       - name: GoReleaser snapshot
-        id: goreleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -56,81 +40,3 @@ jobs:
           args: release --snapshot --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push snapshot image
-        if: github.event_name != 'pull_request'
-        run: |
-          # GoReleaser snapshot builds the image locally but doesn't push.
-          # Push the snapshot image to GHCR for dev/testing.
-          IMAGE="ghcr.io/terrpan/scaleset/scaleset"
-          SHA="${{ github.sha }}"
-          SHORT_SHA="${SHA:0:7}"
-
-          # Try to tag and push the snapshot image with the short SHA.
-          # In snapshot mode, Ko loads images into the local Docker daemon.
-          if docker image inspect "${IMAGE}:latest" >/dev/null 2>&1; then
-            docker tag "${IMAGE}:latest" "${IMAGE}:${SHORT_SHA}"
-            docker push "${IMAGE}:${SHORT_SHA}"
-            echo "image=${IMAGE}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          elif docker image inspect "${IMAGE}:snapshot" >/dev/null 2>&1; then
-            docker tag "${IMAGE}:snapshot" "${IMAGE}:${SHORT_SHA}"
-            docker push "${IMAGE}:${SHORT_SHA}"
-            echo "image=${IMAGE}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::Snapshot image not found in local Docker daemon — skipping push"
-            # List available images for debugging
-            docker images --filter "reference=ghcr.io/terrpan/*" --format "table {{.Repository}}:{{.Tag}}" || true
-          fi
-        id: image-ref
-
-  # ---------------------------------------------------------------------------
-  # Vulnerability Scan — scans the snapshot image on main pushes
-  # Release images are scanned by the release workflow instead.
-  # ---------------------------------------------------------------------------
-  vulnerability-scan:
-    name: Vulnerability Scan
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' && needs.build.outputs.image != ''
-    permissions:
-      contents: read
-      packages: read
-      security-events: write  # Upload SARIF to Security tab
-    steps:
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.30.0
-        with:
-          image-ref: ${{ needs.build.outputs.image }}
-          format: json
-          output: trivy-results.json
-          severity: CRITICAL,HIGH,MEDIUM
-
-      - name: Trivy SARIF report
-        uses: aquasecurity/trivy-action@0.30.0
-        with:
-          image-ref: ${{ needs.build.outputs.image }}
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH,MEDIUM
-
-      - name: Upload Trivy SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
-          category: trivy-container
-
-      - name: Upload vulnerability report
-        uses: actions/upload-artifact@v4
-        with:
-          name: vulnerability-report
-          path: |
-            trivy-results.json
-            trivy-results.sarif
-          retention-days: 90

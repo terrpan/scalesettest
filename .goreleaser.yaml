@@ -44,6 +44,7 @@ kos:
       - ghcr.io/terrpan/scaleset/scaleset
     tags:
       - "{{.Tag}}"
+      - "{{.ShortCommit}}"
       - "{{if not .Prerelease}}latest{{end}}"
     sbom: spdx
     bare: true          # Use base-import-paths style (image name = binary name)
