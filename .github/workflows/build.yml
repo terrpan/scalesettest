@@ -50,13 +50,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # On PRs we build but don't push; on main/tags we push.
+      # On PRs we build but don't push; validates the image builds cleanly.
       - name: Build image (PR — no push)
         if: github.event_name == 'pull_request'
         id: build-pr
         run: |
-          image=$(ko build ./cmd/scaleset --push=false --base-import-paths --tarball=image.tar)
-          echo "image=${image}" >> "$GITHUB_OUTPUT"
+          ko build ./cmd/scaleset --push=false --base-import-paths
 
       - name: Build & push image
         if: github.event_name != 'pull_request'
