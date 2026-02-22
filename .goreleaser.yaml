@@ -57,6 +57,8 @@ kos:
       org.opencontainers.image.licenses: MIT
 
 # ── Archives ──────────────────────────────────────────────────────────
+# Two archive types: tarballs (with README/LICENSE) and raw binaries for
+# quick downloads (e.g. curl | install).
 archives:
   - id: scaleset-archive
     builds:
@@ -66,6 +68,11 @@ archives:
       - goos: windows
         format: zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: scaleset-binary
+    builds:
+      - scaleset
+    format: binary
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 
 # ── Checksum ──────────────────────────────────────────────────────────
 checksum:
@@ -75,7 +82,9 @@ checksum:
 # ── Changelog ─────────────────────────────────────────────────────────
 # Groups commits by conventional commit type for readable release notes.
 changelog:
+  use: git
   sort: asc
+  abbrev: -1   # Hide commit SHAs for cleaner output
   groups:
     - title: "Breaking Changes"
       regexp: '^.*?(\w+)(\(.*\))?!:.+$'
@@ -114,6 +123,19 @@ release:
 
     ```
     docker pull ghcr.io/terrpan/scalesettest/scaleset:{{.Tag}}
+    ```
+
+    ## Install Binary
+
+    Download the standalone binary (no extraction needed):
+    ```bash
+    # Linux amd64
+    curl -Lo scaleset https://github.com/terrpan/scalesettest/releases/download/{{.Tag}}/scaleset_linux_amd64
+    chmod +x scaleset
+
+    # Linux arm64
+    curl -Lo scaleset https://github.com/terrpan/scalesettest/releases/download/{{.Tag}}/scaleset_linux_arm64
+    chmod +x scaleset
     ```
 
     ## Verify SBOM
